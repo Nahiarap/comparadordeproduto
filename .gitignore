@@ -1,0 +1,7 @@
+# XAMPP/Local Config
+setup_banco.sql
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
