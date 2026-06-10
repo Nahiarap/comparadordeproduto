@@ -61,16 +61,29 @@
             <h1 class="fw-bold mb-0">Sua Comparação</h1>
             <p class="text-muted">Análise técnica dos modelos selecionados</p>
         </div>
-        <button class="btn btn-dark rounded-pill px-4" onclick="compartilhar()">
-            <i class="bi bi-share-fill me-2"></i>Compartilhar
-        </button>
+        <div>
+            <button class="btn btn-dark rounded-pill px-4" onclick="compartilhar()">
+                <i class="bi bi-share-fill me-2"></i>Compartilhar
+            </button>
+        </div>
     </div>
 
-    <div id="matriz-comparacao" class="row g-4">
+    <div id="matriz-comparacao" class="row g-4 mb-5">
         <div class="col-12 text-center p-5">
             <div class="spinner-border text-primary" role="status"></div>
             <p class="mt-3 text-muted">Acessando banco de dados...</p>
         </div>
+    </div>
+
+    <hr class="my-5">
+
+    <div class="mb-4">
+        <h2 class="fw-bold">Catálogo de iPhones</h2>
+        <p class="text-muted">Escolha até 3 modelos para comparar</p>
+    </div>
+    
+    <div id="catalogo-produtos" class="row g-4">
+        <!-- Catálogo será carregado aqui -->
     </div>
 </div>
 
@@ -79,31 +92,37 @@
 </footer>
 
 <script>
+// Variável global para armazenar os IDs da comparação atual
+let idsNaComparacao = [];
+
 async function carregarTabela() {
     try {
-        // Busca os dados do seu arquivo acoes.php
-        const res = await fetch('acoes.php?acao=consultar');
+        // Verifica se existem IDs na URL (para o compartilhamento)
+        const urlParams = new URLSearchParams(window.location.search);
+        const idsCompartilhados = urlParams.get('ids');
+        
+        const url = idsCompartilhados ? `acoes.php?acao=consultar&ids=${idsCompartilhados}` : 'acoes.php?acao=consultar';
+        const res = await fetch(url);
         const produtos = await res.json();
         
         const container = document.getElementById('matriz-comparacao');
+        idsNaComparacao = produtos.map(p => p.id);
         
         if (!produtos || produtos.length === 0) {
             container.innerHTML = `
                 <div class="col-12 text-center py-5">
-                    <i class="bi bi-cart-x text-muted" style="font-size: 4rem;"></i>
-                    <h4 class="mt-3 text-muted">Nenhum produto para comparar</h4>
-                    <p>Adicione itens do catálogo para visualizar a matriz.</p>
+                    <i class="bi bi-plus-circle text-muted" style="font-size: 3rem;"></i>
+                    <h4 class="mt-3 text-muted">Nenhum produto selecionado</h4>
+                    <p>Escolha modelos no catálogo abaixo para iniciar a comparação.</p>
                 </div>`;
             return;
         }
 
         let html = '';
         produtos.forEach(p => {
-            // Tratamento do JSON de especificações técnicas
             let specs = {};
-            try {
-                specs = typeof p.especificacoes === 'string' ? JSON.parse(p.especificacoes) : p.especificacoes;
-            } catch (e) { specs = { "Info": "Padrão Apple" }; }
+            try { specs = typeof p.especificacoes === 'string' ? JSON.parse(p.especificacoes) : p.especificacoes; } 
+            catch (e) { specs = { "Info": "Padrão Apple" }; }
 
             html += `
                 <div class="col-md-4">
@@ -111,18 +130,12 @@ async function carregarTabela() {
                         <div class="p-3 d-flex justify-content-end">
                             <button class="btn-close" onclick="excluir(${p.id})" title="Remover"></button>
                         </div>
-                        
                         <div class="img-container">
-                            <img src="${p.imagem}" 
-                                 class="img-comparar" 
-                                 alt="${p.nome}"
-                                 onerror="this.src='https://via.placeholder.com/300x300?text=Imagem+Nao+Encontrada'">
+                            <img src="${p.imagem}" class="img-comparar" alt="${p.nome}">
                         </div>
-                        
                         <div class="card-body px-4 pb-4">
                             <h3 class="h5 fw-bold text-center mb-1">${p.nome}</h3>
                             <p class="price-tag text-center mb-3">R$ ${p.preco}</p>
-                            
                             <div class="spec-box">
                                 ${Object.keys(specs).map(key => `
                                     <div class="spec-item">
@@ -131,10 +144,6 @@ async function carregarTabela() {
                                     </div>
                                 `).join('')}
                             </div>
-                            
-                            <button class="btn btn-primary w-100 rounded-pill mt-4 fw-bold py-2" onclick="vender(${p.id})">
-                                Comprar agora
-                            </button>
                         </div>
                     </div>
                 </div>`;
@@ -143,40 +152,70 @@ async function carregarTabela() {
         
     } catch (error) {
         console.error("Erro:", error);
-        document.getElementById('matriz-comparacao').innerHTML = `
-            <div class="alert alert-danger mx-auto" style="max-width: 500px;">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                Erro de conexão com o Banco de Dados. Verifique o arquivo acoes.php.
-            </div>`;
+    }
+}
+
+async function carregarCatalogo() {
+    try {
+        const res = await fetch('acoes.php?acao=catalogo');
+        const produtos = await res.json();
+        const container = document.getElementById('catalogo-produtos');
+        
+        let html = '';
+        produtos.forEach(p => {
+            html += `
+                <div class="col-md-3">
+                    <div class="card h-100 border-0 shadow-sm rounded-4">
+                        <img src="${p.imagem}" class="card-img-top p-4" style="height: 150px; object-fit: contain;">
+                        <div class="card-body text-center">
+                            <h6 class="fw-bold">${p.nome}</h6>
+                            <button class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-2" onclick="incluir(${p.id})">
+                                + Comparar
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+        });
+        container.innerHTML = html;
+    } catch (e) { console.error(e); }
+}
+
+async function incluir(id) {
+    const res = await fetch(`acoes.php?acao=incluir&id=${id}`);
+    const dados = await res.json();
+    
+    if (dados.error) {
+        alert("⚠️ " + dados.error);
+    } else {
+        carregarTabela();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
 
 async function excluir(id) {
-    if(confirm("Tem certeza que deseja remover este iPhone da comparação?")) {
-        await fetch(`acoes.php?acao=excluir&id=${id}`);
-        carregarTabela(); // Recarrega a tela na hora
-    }
+    await fetch(`acoes.php?acao=excluir&id=${id}`);
+    carregarTabela();
 }
 
 function compartilhar() {
-    // Pegamos o link atual da página
-    const linkDaPagina = window.location.href;
+    if (idsNaComparacao.length === 0) {
+        alert("Adicione produtos primeiro para compartilhar!");
+        return;
+    }
+
+    // Criamos o link com os IDs atuais: index.php?ids=1,2,3
+    const base = window.location.origin + window.location.pathname;
+    const linkFinal = `${base}?ids=${idsNaComparacao.join(',')}`;
     
-    // Usamos a API do navegador para copiar
-    navigator.clipboard.writeText(linkDaPagina).then(() => {
-        // Criamos um alerta visual bonitinho do Bootstrap
-        alert("🚀 Link copiado! Agora você pode enviar para seus colegas verem a mesma comparação.");
-    }).catch(err => {
-        console.error('Erro ao copiar: ', err);
+    navigator.clipboard.writeText(linkFinal).then(() => {
+        alert("🚀 Link de comparação gerado e copiado! \n\n" + linkFinal);
     });
 }
 
-function vender(id) {
-    alert("Integração: Produto " + id + " enviado para o checkout/carrinho!");
-}
-
-// Inicia a busca dos dados assim que a página termina de carregar
-document.addEventListener('DOMContentLoaded', carregarTabela);
+document.addEventListener('DOMContentLoaded', () => {
+    carregarTabela();
+    carregarCatalogo();
+});
 </script>
 
 </body>
